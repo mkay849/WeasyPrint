@@ -15,11 +15,15 @@
 import contextlib
 import os
 import sys
+from base64 import b64encode
 from pathlib import Path
+from xml.etree import ElementTree as ET
 
 import cssselect2
 import html5lib
 import tinycss2
+
+from . import headless_browser
 
 if sys.version_info.major < 3:  # pragma: no cover
     raise RuntimeError(
@@ -53,6 +57,8 @@ from .urls import (  # noqa isort:skip
 from .logger import LOGGER, PROGRESS_LOGGER  # noqa isort:skip
 # Some imports are at the end of the file (after the CSS class)
 # to work around circular imports.
+
+ET.register_namespace('', "http://www.w3.org/2000/svg")
 
 
 class HTML(object):
@@ -118,6 +124,12 @@ class HTML(object):
                     transport_encoding=protocol_encoding,
                     namespaceHTMLElements=False)
             assert result
+        if result.find('.//script[@src]') is not None:
+            PROGRESS_LOGGER.info('Step 1.25 - Embedding external JS into HTML')
+            result = self._include_external_js(result)
+        if result.find('.//script') is not None:
+            PROGRESS_LOGGER.info('Step 1.5 - Executing JS')
+            result = self._execute_js(result)
         self.base_url = find_base_url(result, base_url)
         self.url_fetcher = url_fetcher
         self.media_type = media_type
@@ -134,8 +146,42 @@ class HTML(object):
     def _ph_stylesheets(self):
         return [HTML5_PH_STYLESHEET]
 
+    @staticmethod
+    def _execute_js(html_etree):
+        et_str = ET.tostring(html_etree, encoding='unicode', method='html')
+        selenium_browser = headless_browser.FakeChrome(headless=True)
+        selenium_browser.get(HTML._html_to_data_uri(et_str))
+        html_source = selenium_browser.page_source
+        assert html_source
+        html_etree = html5lib.parse(html_source, namespaceHTMLElements=False)
+        # Remove scripts
+        js_scripts = html_etree.findall('.//script')
+        for js_script in js_scripts:
+            js_script.clear()
+        return html_etree
+
     def _get_metadata(self):
         return get_html_metadata(self.wrapper_element, self.base_url)
+
+    @staticmethod
+    def _html_to_data_uri(html, file_type='text/html'):
+        if isinstance(html, str):
+            html = html.encode("utf-8", "replace")
+        b64 = b64encode(html).decode("utf-8", "replace")
+        return f"data:{file_type};base64,{b64}"
+
+    @staticmethod
+    def _include_external_js(html_etree):
+        ext_scripts = html_etree.findall('.//script[@src]')
+        for ext_script in ext_scripts:
+            try:
+                fd = open(ext_script.get('src'), 'r')
+                with fd as fh:
+                    ext_script.set('src', HTML._html_to_data_uri(fh.read()))
+            except IOError:
+                LOGGER.warning(f"Could not open {ext_script.get('src')}")
+                continue
+        return html_etree
 
     def render(self, stylesheets=None, enable_hinting=False,
                presentational_hints=False, font_config=None,
