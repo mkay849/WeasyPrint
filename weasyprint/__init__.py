@@ -58,8 +58,6 @@ from .logger import LOGGER, PROGRESS_LOGGER  # noqa isort:skip
 # Some imports are at the end of the file (after the CSS class)
 # to work around circular imports.
 
-ET.register_namespace('', "http://www.w3.org/2000/svg")
-
 
 class HTML(object):
     """Represents an HTML document parsed by html5lib.
