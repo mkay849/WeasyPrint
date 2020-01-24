@@ -13,9 +13,12 @@ import io
 import math
 import shutil
 import warnings
+from base64 import b64encode
 
 import cairocffi as cairo
+from cairosvg import svg2png
 from weasyprint.layout import LayoutContext
+from xml.etree import ElementTree as ET
 
 from . import CSS
 from .css import get_all_computed_styles
@@ -370,6 +373,8 @@ class Document(object):
         style_for = get_all_computed_styles(
             html, user_stylesheets, presentational_hints, font_config,
             counter_style, page_rules, target_collector)
+        PROGRESS_LOGGER.info('Step 3.5 - Converting all inline svg images to data uris after css has been applied')
+        cls._convert_inline_svg(html)
         get_image_from_uri = functools.partial(
             original_get_image_from_uri, {}, html.url_fetcher)
         PROGRESS_LOGGER.info('Step 4 - Creating formatting structure')
@@ -377,6 +382,21 @@ class Document(object):
             enable_hinting, style_for, get_image_from_uri, font_config,
             counter_style, target_collector)
         return context
+
+    @classmethod
+    def _convert_inline_svg(cls, html):
+        svg_images = html.etree_element.findall('.//svg') or \
+                     html.etree_element.findall('.//{http://www.w3.org/2000/svg}svg')
+        for svg_img in svg_images:
+            png = svg2png(
+                ET.tostring(svg_img, encoding='unicode', method='html'),
+                parent_width=svg_img.get('width', 640),
+                parent_height=svg_img.get('height', 480)
+            )
+            data_uri = f"data:image/png;base64,{b64encode(png).decode('utf-8', 'replace')}"
+            svg_img.clear()
+            svg_img.tag = 'img'
+            svg_img.set('src', data_uri)
 
     @classmethod
     def _render(cls, html, stylesheets, enable_hinting,
