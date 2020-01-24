@@ -154,6 +154,8 @@ def empty_cells(keyword):
 
 
 @property('color')
+@property('fill-color')
+@property('stroke-color')
 @single_token
 def color(token):
     """``*-color`` and ``color`` properties validation."""
@@ -197,6 +199,8 @@ def transform_origin(tokens):
 
 
 @property()
+@property('fill-position')
+@property('stroke-position')
 @comma_separated_list
 def background_position(tokens):
     """``background-position`` property validation."""
@@ -945,6 +949,8 @@ def max_width_height(token):
 
 
 @property()
+@property('fill-opacity')
+@property('stroke-opacity')
 @single_token
 def opacity(token):
     """Validation for the ``opacity`` property."""
@@ -1453,3 +1459,72 @@ def transform(tokens):
             else:
                 return
         return tuple(transforms)
+
+
+@property()
+@comma_separated_list
+def box_shadow(tokens):
+    """Validation for ``box-shaddow``."""
+    single_keyword = get_single_keyword(tokens)
+    if single_keyword == 'none':
+        return ()
+    elif single_keyword in ('inherit', 'initial', 'unset'):
+        return single_keyword.value
+    else:
+        shaddows = []
+        for token in tokens:
+            function = parse_function(token)
+            if not function:
+                if token.type in ('number', 'dimension'):
+                    shaddows.append(token)
+                elif token == 'inset':
+                    shaddows.append(token)
+                else:
+                    shaddows.append(parse_color(token))
+            else:
+                name, args = function
+                shaddows.append((name, tuple(arg.value for arg in args)))
+        if len(shaddows):
+            return tuple(shaddows)
+
+
+@property()
+@single_keyword
+def dominant_baseline(keyword):
+    return keyword.lower() in ('auto', 'text-bottom', 'alphabetic', 'ideographic', 'middle',
+                               'central', 'mathematical', 'hanging', 'text-top')
+
+
+@property()
+@single_keyword
+def shape_rendering(keyword):
+    return keyword.lower() in ('auto', 'optimizespeed', 'crispedges', 'geometricprecision')
+
+
+@property(unstable=True)
+@comma_separated_list
+def stroke_dasharray(tokens):
+    if len(tokens) > 1:
+        result = []
+        for keyword in tokens:
+            result.append(stroke_width([keyword]))
+        return tuple(result)
+    elif tokens and get_keyword(tokens[0]) == 'none':
+        return 'none'
+
+
+@property()
+@single_token
+def stroke_width(token):
+    """``stroke-width`` properties validation."""
+    length = get_length(token, negative=False, percentage=True)
+    if length:
+        return length
+    elif token.type == 'number' and token.value > 0:
+        return Dimension(token.value, 'px')
+
+
+@property()
+@single_keyword
+def text_anchor(keyword):
+    return keyword in ('start', 'middle', 'end', 'inherit')

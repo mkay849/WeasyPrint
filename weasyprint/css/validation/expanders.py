@@ -596,3 +596,97 @@ def expand_flex_flow(base_url, name, tokens):
                 raise InvalidValues
     else:
         raise InvalidValues
+
+
+@expander('fill')
+@expander('stroke')
+def expand_fill(base_url, name, tokens):
+    """Expand the ``fill`` shorthand property.
+
+    See https://www.w3.org/TR/fill-stroke-3/#fill-shorthand
+
+    """
+    properties = [
+        f"{name}_color", f"{name}_image", f"{name}_repeat",
+        f"{name}_position", f"{name}_size", f"{name}_origin"]
+    keyword = get_single_keyword(tokens)
+    if keyword == 'match-parent':
+        for name in properties:
+            yield name, keyword
+        return
+
+    def parse_layer(name, tokens, final_layer=False):
+        results = {}
+
+        def add(name, suffix, value):
+            if value is None:
+                return False
+            cur_name = f'{name}_{suffix}'
+            if cur_name in results:
+                raise InvalidValues
+            results[cur_name] = value
+            return True
+
+        # Make `tokens` a stack
+        tokens = tokens[::-1]
+        while tokens:
+            if add(name, 'repeat',
+                   background_repeat.single_value(tokens[-2:][::-1])):
+                del tokens[-2:]
+                continue
+            token = tokens[-1:]
+            if final_layer and add(name, 'color', other_colors(token)):
+                tokens.pop()
+                continue
+            if add(name, 'image', background_image.single_value(token, base_url)):
+                tokens.pop()
+                continue
+            if add(name, 'repeat', background_repeat.single_value(token)):
+                tokens.pop()
+                continue
+            for n in (4, 3, 2, 1)[-len(tokens):]:
+                n_tokens = tokens[-n:][::-1]
+                position = background_position.single_value(n_tokens)
+                if position is not None:
+                    assert add(name, 'position', position)
+                    del tokens[-n:]
+                    if (tokens and tokens[-1].type == 'literal' and
+                            tokens[-1].value == '/'):
+                        for n in (3, 2)[-len(tokens):]:
+                            # n includes the '/' delimiter.
+                            n_tokens = tokens[-n:-1][::-1]
+                            size = background_size.single_value(n_tokens)
+                            if size is not None:
+                                assert add(name, 'size', size)
+                                del tokens[-n:]
+                    break
+            if position is not None:
+                continue
+            # if add('origin', box.single_value(token)):
+            #     tokens.pop()
+            #     next_token = tokens[-1:]
+            #     if add('clip', box.single_value(next_token)):
+            #         tokens.pop()
+            #     else:
+            #         # The same keyword sets both:
+            #         assert add('clip', box.single_value(token))
+            #     continue
+            raise InvalidValues
+
+        color = results.pop(
+            f'{name}_color', INITIAL_VALUES[f'{name}_color'])
+        for name in properties:
+            if name not in results:
+                results[name] = INITIAL_VALUES[name][0]
+        return color, results
+
+    layers = reversed(split_on_comma(tokens))
+    color, last_layer = parse_layer(name, next(layers), final_layer=True)
+    results = dict((k, [v]) for k, v in last_layer.items())
+    for tokens in layers:
+        _, layer = parse_layer(name, tokens)
+        for name, value in layer.items():
+            results[name].append(value)
+    for name, values in results.items():
+        yield name, values[::-1]  # "Un-reverse"
+    yield f'{name}-color', color

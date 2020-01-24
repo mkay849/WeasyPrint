@@ -201,6 +201,42 @@ INITIAL_VALUES = {
     'list_style_position': 'outside',
     'list_style_type': 'disc',
 
+    # Scalable Vector Graphics (SVG) 1.1 (Second Edition) https://www.w3.org/TR/SVG11/
+    'box_shadow': 'none',
+    'dominant_baseline': 'auto',
+    'shape_rendering': 'auto',
+    'text_anchor': 'start',
+
+    # Fill and Stroke Module (WD): https://www.w3.org/TR/fill-stroke-3/
+    'fill': None,
+    'fill_color': parse_color('transparent'),
+    'fill_image': 'none',
+    'fill_opacity': 1,
+    'fill_origin': 'match-parent',
+    'fill_position': (('left', Dimension(0, '%'),
+                       'top', Dimension(0, '%')),),
+    'fill_repeat': 'repeat',
+    'fill_size': 'auto',
+    'stroke': None,
+    'stroke_align': 'center',
+    'stroke_break': 'bounding-box',
+    'stroke_color': parse_color('transparent'),
+    'stroke_dasharray': 'none',
+    'stroke_dash_corner': 'none',
+    'stroke_dash_justify': 'none',
+    'stroke_dashoffset': 0,
+    'stroke_image': 'none',
+    'stroke_linecap': 'butt',
+    'stroke_linejoin': 'miter',
+    'stroke_miterlimit': 4,
+    'stroke_opacity': 1,
+    'stroke_origin': 'match-parent',
+    'stroke_position': (('left', Dimension(0, '%'),
+                       'top', Dimension(0, '%')),),
+    'stroke_repeat': 'repeat',
+    'stroke_size': 'auto',
+    'stroke_width': Dimension(1, 'px'),
+
     # Proprietary
     'anchor': None,  # computed value of 'none'
     'link': None,  # computed value of 'none'
